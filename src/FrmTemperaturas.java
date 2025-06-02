@@ -2,7 +2,7 @@ import entidades.RegistroTemperatura;
 import servicios.TemperaturasServicios;
 
 import javax.swing.*;
-import javax.swing.table.DefaultTableModel; // Importación faltante
+import javax.swing.table.DefaultTableModel;
 
 import org.jfree.chart.JFreeChart;
 import org.jfree.data.category.DefaultCategoryDataset;
@@ -20,23 +20,22 @@ public class FrmTemperaturas extends JFrame {
     private JPanel pnlGrafica;
     private JPanel pnlConsultas;
     private JTable tblDatos;
-    private DefaultTableModel modeloTabla; // Ahora debería funcionar
+    private DefaultTableModel modeloTabla;
     private List<RegistroTemperatura> datos;
-    private final String RUTA_ARCHIVO = "datos/Temperaturas.csv";
+    private final String RUTA_ARCHIVO = "src/datos/Temperaturas.csv";
     private JTextField txtFechaDesde;
     private JTextField txtFechaHasta;
     private JTextField txtFechaConsulta;
     private JTextArea txtResultados;
 
     public FrmTemperaturas() {
+
         setTitle("Registro de Temperaturas");
         setSize(900, 600);
         setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
 
-        // Cargar datos iniciales
         datos = TemperaturasServicios.cargarDesdeArchivo(RUTA_ARCHIVO);
 
-        // Configurar barra de herramientas
         JToolBar tb = new JToolBar();
 
         JButton btnAgregar = new JButton();
@@ -69,24 +68,20 @@ public class FrmTemperaturas extends JFrame {
         btnGraficar.addActionListener(this::mostrarGrafica);
         tb.add(btnGraficar);
 
-        // Panel principal con BoxLayout
         JPanel pnlPrincipal = new JPanel();
         pnlPrincipal.setLayout(new BoxLayout(pnlPrincipal, BoxLayout.Y_AXIS));
 
-        // Panel superior para controles
         JPanel pnlControles = new JPanel(new FlowLayout(FlowLayout.LEFT));
         pnlControles.setMaximumSize(new Dimension(Integer.MAX_VALUE, 60));
 
-        // Tabla de datos
         JPanel pnlTabla = new JPanel(new BorderLayout());
-        // Crear el modelo de tabla con columnas y 0 filas inicialmente
+
         modeloTabla = new DefaultTableModel(
                 new Object[] { "Ciudad", "Fecha", "Temperatura (°C)" }, 0);
         tblDatos = new JTable(modeloTabla);
         actualizarTabla();
         pnlTabla.add(new JScrollPane(tblDatos), BorderLayout.CENTER);
 
-        // Pestañas
         tpCambiosMoneda = new JTabbedPane();
         tpCambiosMoneda.addTab("Datos", pnlTabla);
 
@@ -98,7 +93,6 @@ public class FrmTemperaturas extends JFrame {
         gbc.insets = new Insets(5, 5, 5, 5);
         gbc.anchor = GridBagConstraints.WEST;
 
-        // Panel para rango de fechas (gráfica)
         JPanel pnlRangoFechas = new JPanel(new FlowLayout(FlowLayout.LEFT));
         pnlRangoFechas.add(new JLabel("Rango (dd/MM/yyyy):"));
         txtFechaDesde = new JTextField(10);
@@ -107,7 +101,6 @@ public class FrmTemperaturas extends JFrame {
         txtFechaHasta = new JTextField(10);
         pnlRangoFechas.add(txtFechaHasta);
 
-        // Panel para consulta por fecha
         JPanel pnlConsultaFecha = new JPanel(new FlowLayout(FlowLayout.LEFT));
         pnlConsultaFecha.add(new JLabel("Consultar fecha (dd/MM/yyyy):"));
         txtFechaConsulta = new JTextField(10);
@@ -116,12 +109,10 @@ public class FrmTemperaturas extends JFrame {
         btnConsultar.addActionListener(this::consultarFechaEspecifica);
         pnlConsultaFecha.add(btnConsultar);
 
-        // Área de resultados
         txtResultados = new JTextArea(5, 50);
         txtResultados.setEditable(false);
         JScrollPane scrollResultados = new JScrollPane(txtResultados);
 
-        // Configurar layout de consultas
         gbc.gridx = 0;
         gbc.gridy = 0;
         gbc.gridwidth = 2;
@@ -142,11 +133,9 @@ public class FrmTemperaturas extends JFrame {
 
         tpCambiosMoneda.addTab("Consultas", pnlConsultas);
 
-        // Agregar componentes al panel principal
         pnlPrincipal.add(pnlControles);
         pnlPrincipal.add(tpCambiosMoneda);
 
-        // Agregar al frame
         getContentPane().add(tb, BorderLayout.NORTH);
         getContentPane().add(pnlPrincipal, BorderLayout.CENTER);
 
@@ -155,12 +144,10 @@ public class FrmTemperaturas extends JFrame {
     }
 
     private void actualizarTabla() {
-        // Limpiar la tabla
+
         modeloTabla.setRowCount(0);
         DateTimeFormatter formato = DateTimeFormatter.ofPattern("dd/MM/yyyy");
-        System.out.println("Cargando " + datos.size() + " filas en la tabla");
 
-        // Llenar la tabla con los datos
         for (RegistroTemperatura r : datos) {
             modeloTabla.addRow(new Object[] {
                     r.getCiudad(),
@@ -296,7 +283,7 @@ public class FrmTemperaturas extends JFrame {
             JFreeChart grafica = TemperaturasServicios.getGraficaBarras(
                     dataset, "Promedio de Temperaturas: " + desde + " a " + hasta);
             TemperaturasServicios.mostrarGraficaBarras(pnlGrafica, grafica);
-            tpCambiosMoneda.setSelectedIndex(1); // Cambiar a pestaña de gráfica
+            tpCambiosMoneda.setSelectedIndex(1);
 
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this,
