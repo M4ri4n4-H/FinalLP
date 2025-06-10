@@ -151,4 +151,53 @@ public class TemperaturasServicios {
         resultado.put("min", min);
         return resultado;
     }
+
+    private static boolean esMayor(RegistroTemperatura r1, RegistroTemperatura r2) {
+        int compCiudad = r1.getCiudad().compareTo(r2.getCiudad());
+        if (compCiudad > 0)
+            return true;
+        if (compCiudad == 0) {
+            return r1.getFecha().isAfter(r2.getFecha());
+        }
+        return false;
+    }
+
+    private static void intercambiar(List<RegistroTemperatura> lista, int i, int j) {
+        if (i >= 0 && j >= 0 && i < lista.size() && j < lista.size()) {
+            RegistroTemperatura temp = lista.get(i);
+            lista.set(i, lista.get(j));
+            lista.set(j, temp);
+        }
+    }
+
+    private static int getPivote(List<RegistroTemperatura> lista, int inicio, int fin) {
+        int pivote = inicio;
+        RegistroTemperatura ref = lista.get(pivote);
+
+        for (int i = inicio + 1; i <= fin; i++) {
+            if (esMayor(ref, lista.get(i))) {
+                pivote++;
+                if (i != pivote) {
+                    intercambiar(lista, i, pivote);
+                }
+            }
+        }
+        if (inicio != pivote) {
+            intercambiar(lista, inicio, pivote);
+        }
+
+        return pivote;
+    }
+
+    private static void ordenarRapido(List<RegistroTemperatura> lista, int inicio, int fin) {
+        if (fin > inicio) {
+            int pivote = getPivote(lista, inicio, fin);
+            ordenarRapido(lista, inicio, pivote - 1);
+            ordenarRapido(lista, pivote + 1, fin);
+        }
+    }
+
+    public static void ordenarPorCiudadYFecha(List<RegistroTemperatura> lista) {
+        ordenarRapido(lista, 0, lista.size() - 1);
+    }
 }

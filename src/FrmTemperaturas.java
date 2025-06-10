@@ -4,17 +4,25 @@ import servicios.TemperaturasServicios;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 
+import org.jfree.chart.ChartPanel;
 import org.jfree.chart.JFreeChart;
 import org.jfree.data.category.DefaultCategoryDataset;
 
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import datechooser.beans.DateChooserCombo;
+import java.time.LocalDate;
+import java.time.ZoneId;
 
 public class FrmTemperaturas extends JFrame {
+    private DateChooserCombo dccDesde, dccHasta;
 
     private JTabbedPane tpCambiosMoneda;
     private JPanel pnlGrafica;
@@ -71,9 +79,6 @@ public class FrmTemperaturas extends JFrame {
         JPanel pnlPrincipal = new JPanel();
         pnlPrincipal.setLayout(new BoxLayout(pnlPrincipal, BoxLayout.Y_AXIS));
 
-        JPanel pnlControles = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        pnlControles.setMaximumSize(new Dimension(Integer.MAX_VALUE, 60));
-
         JPanel pnlTabla = new JPanel(new BorderLayout());
 
         modeloTabla = new DefaultTableModel(
@@ -93,52 +98,57 @@ public class FrmTemperaturas extends JFrame {
         gbc.insets = new Insets(5, 5, 5, 5);
         gbc.anchor = GridBagConstraints.WEST;
 
-        JPanel pnlRangoFechas = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        pnlRangoFechas.add(new JLabel("Rango (dd/MM/yyyy):"));
-        txtFechaDesde = new JTextField(10);
-        pnlRangoFechas.add(txtFechaDesde);
-        pnlRangoFechas.add(new JLabel("a"));
-        txtFechaHasta = new JTextField(10);
-        pnlRangoFechas.add(txtFechaHasta);
-
         JPanel pnlConsultaFecha = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        pnlConsultaFecha.add(new JLabel("Consultar fecha (dd/MM/yyyy):"));
-        txtFechaConsulta = new JTextField(10);
-        pnlConsultaFecha.add(txtFechaConsulta);
+        pnlConsultaFecha.add(new JLabel("Consultar fecha:"));
+        DateChooserCombo dccConsulta = new DateChooserCombo();
+        pnlConsultaFecha.add(dccConsulta);
         JButton btnConsultar = new JButton("Consultar");
-        btnConsultar.addActionListener(this::consultarFechaEspecifica);
+        btnConsultar.addActionListener(e -> {
+            if (dccConsulta.getSelectedDate() != null) {
+                LocalDate fecha = dccConsulta.getSelectedDate().toInstant()
+                        .atZone(ZoneId.systemDefault()).toLocalDate();
+                consultarFechaEspecifica(fecha);
+            } else {
+                JOptionPane.showMessageDialog(this,
+                        "Seleccione una fecha",
+                        "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        });
         pnlConsultaFecha.add(btnConsultar);
 
         txtResultados = new JTextArea(5, 50);
         txtResultados.setEditable(false);
         JScrollPane scrollResultados = new JScrollPane(txtResultados);
 
+        setTitle("Registro de Temperaturas");
+        setSize(900, 600);
+        setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+
+        // Cargar datos predeterminados al inicio
+        datos = TemperaturasServicios.cargarDesdeArchivo(RUTA_ARCHIVO);
+
+
+        // Nuevo diseño simplificado
         gbc.gridx = 0;
         gbc.gridy = 0;
         gbc.gridwidth = 2;
-        pnlConsultas.add(new JLabel("Gráfica de promedios:"), gbc);
-
-        gbc.gridy = 1;
-        pnlConsultas.add(pnlRangoFechas, gbc);
-
-        gbc.gridy = 2;
         pnlConsultas.add(new JLabel("Ciudades extremas por fecha:"), gbc);
 
-        gbc.gridy = 3;
+        gbc.gridy = 1;
         pnlConsultas.add(pnlConsultaFecha, gbc);
 
-        gbc.gridy = 4;
+        gbc.gridy = 2;
         gbc.fill = GridBagConstraints.BOTH;
         pnlConsultas.add(scrollResultados, gbc);
 
         tpCambiosMoneda.addTab("Consultas", pnlConsultas);
 
-        pnlPrincipal.add(pnlControles);
         pnlPrincipal.add(tpCambiosMoneda);
 
         getContentPane().add(tb, BorderLayout.NORTH);
         getContentPane().add(pnlPrincipal, BorderLayout.CENTER);
 
+        TemperaturasServicios.ordenarPorCiudadYFecha(datos);
         actualizarTabla();
 
     }
@@ -158,17 +168,7 @@ public class FrmTemperaturas extends JFrame {
     }
 
     private void agregarDato(ActionEvent evt) {
-        JPanel panel = new JPanel(new GridLayout(3, 2));
-        JTextField txtCiudad = new JTextField();
-        JTextField txtFecha = new JTextField();
-        JTextField txtTemperatura = new JTextField();
-
-        panel.add(new JLabel("Ciudad:"));
-        panel.add(txtCiudad);
-        panel.add(new JLabel("Fecha (dd/MM/yyyy):"));
-        panel.add(txtFecha);
-        panel.add(new JLabel("Temperatura:"));
-        panel.add(txtTemperatura);
+        JPanel panel = crearPanelEdicion(null);
 
         int resultado = JOptionPane.showConfirmDialog(
                 this, panel, "Agregar Registro",
@@ -176,16 +176,20 @@ public class FrmTemperaturas extends JFrame {
 
         if (resultado == JOptionPane.OK_OPTION) {
             try {
-                DateTimeFormatter formato = DateTimeFormatter.ofPattern("dd/MM/yyyy");
-                RegistroTemperatura nuevo = new RegistroTemperatura(
-                        txtCiudad.getText(),
-                        LocalDate.parse(txtFecha.getText(), formato),
-                        Double.parseDouble(txtTemperatura.getText()));
+                Component[] components = panel.getComponents();
+                String ciudad = ((JTextField) components[1]).getText();
+                LocalDate fecha = ((DateChooserCombo) components[3]).getSelectedDate()
+                        .toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+                double temperatura = Double.parseDouble(((JTextField) components[5]).getText());
+
+                RegistroTemperatura nuevo = new RegistroTemperatura(ciudad, fecha, temperatura);
                 TemperaturasServicios.agregar(datos, nuevo);
+                TemperaturasServicios.ordenarPorCiudadYFecha(datos);
                 actualizarTabla();
+
             } catch (Exception e) {
                 JOptionPane.showMessageDialog(this,
-                        "Error en formato: " + e.getMessage(),
+                        "Error: " + e.getMessage(),
                         "Error", JOptionPane.ERROR_MESSAGE);
             }
         }
@@ -201,18 +205,7 @@ public class FrmTemperaturas extends JFrame {
         }
 
         RegistroTemperatura registro = datos.get(fila);
-        JPanel panel = new JPanel(new GridLayout(3, 2));
-        JTextField txtCiudad = new JTextField(registro.getCiudad());
-        JTextField txtFecha = new JTextField(registro.getFecha()
-                .format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
-        JTextField txtTemperatura = new JTextField(String.valueOf(registro.getTemperatura()));
-
-        panel.add(new JLabel("Ciudad:"));
-        panel.add(txtCiudad);
-        panel.add(new JLabel("Fecha (dd/MM/yyyy):"));
-        panel.add(txtFecha);
-        panel.add(new JLabel("Temperatura:"));
-        panel.add(txtTemperatura);
+        JPanel panel = crearPanelEdicion(registro);
 
         int resultado = JOptionPane.showConfirmDialog(
                 this, panel, "Modificar Registro",
@@ -220,17 +213,20 @@ public class FrmTemperaturas extends JFrame {
 
         if (resultado == JOptionPane.OK_OPTION) {
             try {
-                DateTimeFormatter formato = DateTimeFormatter.ofPattern("dd/MM/yyyy");
-                RegistroTemperatura actualizado = new RegistroTemperatura(
-                        txtCiudad.getText(),
-                        LocalDate.parse(txtFecha.getText(), formato),
-                        Double.parseDouble(txtTemperatura.getText()));
-                TemperaturasServicios.modificar(datos, fila, actualizado);
+                Component[] components = panel.getComponents();
+                String ciudad = ((JTextField) components[1]).getText();
+                LocalDate fecha = ((DateChooserCombo) components[3]).getSelectedDate()
+                        .toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+                double temperatura = Double.parseDouble(((JTextField) components[5]).getText());
 
+                RegistroTemperatura actualizado = new RegistroTemperatura(ciudad, fecha, temperatura);
+                TemperaturasServicios.modificar(datos, fila, actualizado);
+                TemperaturasServicios.ordenarPorCiudadYFecha(datos);
                 actualizarTabla();
+
             } catch (Exception e) {
                 JOptionPane.showMessageDialog(this,
-                        "Error en formato: " + e.getMessage(),
+                        "Error: " + e.getMessage(),
                         "Error", JOptionPane.ERROR_MESSAGE);
             }
         }
@@ -263,41 +259,117 @@ public class FrmTemperaturas extends JFrame {
     }
 
     private void mostrarGrafica(ActionEvent evt) {
-        DateTimeFormatter formato = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+        // Crear panel de fechas si no existe
+        if (dccDesde == null) {
+            dccDesde = new DateChooserCombo();
+            dccHasta = new DateChooserCombo();
 
-        try {
-            LocalDate desde = LocalDate.parse(txtFechaDesde.getText(), formato);
-            LocalDate hasta = LocalDate.parse(txtFechaHasta.getText(), formato);
+            JPanel pnlFechas = new JPanel(new FlowLayout(FlowLayout.LEFT));
+            pnlFechas.add(new JLabel("Desde:"));
+            pnlFechas.add(dccDesde);
+            pnlFechas.add(new JLabel("Hasta:"));
+            pnlFechas.add(dccHasta);
 
-            Map<String, Double> promedios = TemperaturasServicios.calcularPromedios(
-                    datos, desde, hasta);
+            JButton btnGenerar = new JButton("Generar Gráfica");
+            btnGenerar.addActionListener(e -> generarGrafica());
+            pnlFechas.add(btnGenerar);
 
-            if (promedios.isEmpty()) {
-                JOptionPane.showMessageDialog(this,
-                        "No hay datos en el rango seleccionado",
-                        "Información", JOptionPane.INFORMATION_MESSAGE);
-                return;
-            }
-
-            DefaultCategoryDataset dataset = TemperaturasServicios.getDatosGraficaBarras(promedios);
-            JFreeChart grafica = TemperaturasServicios.getGraficaBarras(
-                    dataset, "Promedio de Temperaturas: " + desde + " a " + hasta);
-            TemperaturasServicios.mostrarGraficaBarras(pnlGrafica, grafica);
-            tpCambiosMoneda.setSelectedIndex(1);
-
-        } catch (Exception e) {
-            JOptionPane.showMessageDialog(this,
-                    "Formato de fecha inválido. Use dd/MM/yyyy",
-                    "Error", JOptionPane.ERROR_MESSAGE);
+            // Añadir el panel de fechas al NORTH del panel principal de gráfica
+            pnlGrafica.add(pnlFechas, BorderLayout.NORTH);
         }
+
+        // Cambiar a la pestaña de la gráfica
+        tpCambiosMoneda.setSelectedIndex(1);
     }
 
-    private void consultarFechaEspecifica(ActionEvent evt) {
-        DateTimeFormatter formato = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    private void generarGrafica() {
+        LocalDate desde = dccDesde.getSelectedDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+        LocalDate hasta = dccHasta.getSelectedDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
 
+        if (desde == null || hasta == null) {
+            JOptionPane.showMessageDialog(this, "Por favor, seleccione ambas fechas.", "Error",
+                    JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        Map<String, Double> promedios = TemperaturasServicios.calcularPromedios(datos, desde, hasta);
+
+        if (promedios.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "No hay datos en el rango seleccionado.", "Información",
+                    JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+
+        DefaultCategoryDataset dataset = TemperaturasServicios.getDatosGraficaBarras(promedios);
+        JFreeChart grafica = TemperaturasServicios.getGraficaBarras(dataset,
+                "Promedio de Temperaturas: " + desde + " a " + hasta);
+
+        // Crear un panel para la gráfica (sin afectar el panel de fechas)
+        JPanel pnlContenedorGrafica = new JPanel(new BorderLayout());
+        ChartPanel panelGrafica = new ChartPanel(grafica);
+        pnlContenedorGrafica.add(panelGrafica, BorderLayout.CENTER);
+
+        // Limpiar solo el CENTER del panel principal (conservando NORTH con las fechas)
+        pnlGrafica.removeAll();
+        pnlGrafica.add(pnlContenedorGrafica, BorderLayout.CENTER);
+
+        // Si el panel de fechas no está, lo volvemos a añadir
+        if (dccDesde != null) {
+            JPanel pnlFechas = new JPanel(new FlowLayout(FlowLayout.LEFT));
+            pnlFechas.add(new JLabel("Desde:"));
+            pnlFechas.add(dccDesde);
+            pnlFechas.add(new JLabel("Hasta:"));
+            pnlFechas.add(dccHasta);
+
+            JButton btnGenerar = new JButton("Generar Gráfica");
+            btnGenerar.addActionListener(e -> generarGrafica());
+            pnlFechas.add(btnGenerar);
+
+            pnlGrafica.add(pnlFechas, BorderLayout.NORTH);
+        }
+
+        pnlGrafica.revalidate();
+        pnlGrafica.repaint();
+    }
+
+    // nuevo helper
+    private JPanel crearPanelEdicion(RegistroTemperatura registroExistente) {
+        JPanel panel = new JPanel(new GridLayout(3, 2, 5, 5));
+
+        // Campo Ciudad
+        JTextField txtCiudad = new JTextField();
+        if (registroExistente != null) {
+            txtCiudad.setText(registroExistente.getCiudad());
+        }
+
+        // Selector de Fecha (DateChooserCombo)
+        DateChooserCombo dccFecha = new DateChooserCombo();
+        if (registroExistente != null) {
+            Calendar calendar = Calendar.getInstance();
+            calendar.setTime(Date.from(registroExistente.getFecha()
+                    .atStartOfDay(ZoneId.systemDefault()).toInstant()));
+            dccFecha.setSelectedDate(calendar); // Ahora usando Calendar
+        }
+
+        // Campo Temperatura
+        JTextField txtTemperatura = new JTextField();
+        if (registroExistente != null) {
+            txtTemperatura.setText(String.valueOf(registroExistente.getTemperatura()));
+        }
+
+        panel.add(new JLabel("Ciudad:"));
+        panel.add(txtCiudad);
+        panel.add(new JLabel("Fecha:"));
+        panel.add(dccFecha);
+        panel.add(new JLabel("Temperatura (°C):"));
+        panel.add(txtTemperatura);
+
+        return panel;
+    }
+    //
+
+    private void consultarFechaEspecifica(LocalDate fecha) {
         try {
-            LocalDate fecha = LocalDate.parse(txtFechaConsulta.getText(), formato);
-
             Map<String, RegistroTemperatura> extremos = TemperaturasServicios.encontrarExtremosPorFecha(datos, fecha);
 
             txtResultados.setText("");
@@ -314,8 +386,10 @@ public class FrmTemperaturas extends JFrame {
 
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this,
-                    "Formato de fecha inválido. Use dd/MM/yyyy",
+                    "Error al consultar fecha",
                     "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
+
+    
 }

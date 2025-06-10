@@ -3,3 +3,4 @@ public class App {
         new FrmTemperaturas().setVisible(true);
     }
 }
+//Hecho por Daniel Sanchez y Mariana Henao
